@@ -45,7 +45,12 @@ HRESULT AppContainer::DeleteContainer(const std::wstring & containerName)
         return E_FAIL;
     }
 
-    return ::DeleteAppContainerProfile(containerName.c_str());
+    const HRESULT result = ::DeleteAppContainerProfile(containerName.c_str());
+    if (SUCCEEDED(result))
+    {
+        std::wcout << L"Successfully deleted container " << containerName << std::endl;
+    }
+    return result;
 }
 
 HRESULT AppContainer::DeleteContainer()
@@ -159,11 +164,11 @@ HRESULT AppContainer::GrantAccessImpl(const std::wstring & filePath, const std::
 {
     PSID sid = nullptr;
     LPWSTR stringSid = nullptr;
-    bool success = false;
+    HRESULT result = E_FAIL;
 
     do
     {
-        HRESULT result = ::DeriveAppContainerSidFromAppContainerName(containerName.c_str(), &sid);
+        result = ::DeriveAppContainerSidFromAppContainerName(containerName.c_str(), &sid);
         if (!SUCCEEDED(result))
         {
             std::wcout << L"Failed to get existing AppContainer name, error code: " << HRESULT_CODE(result) << std::endl;
@@ -176,18 +181,17 @@ HRESULT AppContainer::GrantAccessImpl(const std::wstring & filePath, const std::
         if (::ConvertSidToStringSidW(sid, &stringSid))
         {
             std::wcout << L"Sid: " << stringSid << std::endl;
+            result = E_FAIL;
         }
-
 
         if (!GrantNamedObjectAccess(sid, filePath.c_str(), SE_FILE_OBJECT, FILE_ALL_ACCESS))
         {
+            result = E_FAIL;
             std::wcout << L"Failed to grant explicit access to " << filePath << std::endl;
-
             break;
         }
 
         std::wcout << L"Successfully granted access to " << filePath << std::endl;
-        success = true;
     } while (false);
 
     if (sid)
@@ -200,7 +204,7 @@ HRESULT AppContainer::GrantAccessImpl(const std::wstring & filePath, const std::
         LocalFree(stringSid);
     }
 
-    return success;
+    return result;
 }
 
 bool AppContainer::SetSecurityCapabilities(PSID containerSid, SECURITY_CAPABILITIES * capabilities, PDWORD numCapabilities)
